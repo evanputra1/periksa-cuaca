@@ -14,11 +14,11 @@ body {
 }
 
 h1 {
-    background: #a6c1ee;
+    background: #724ae8;
     box-shadow: 0px 0px 25px 0px rgba(0,0,0,0.5);
     font-size: 28px;
     text-align: center;
-    color: #212121;
+    color: white;
     padding: 15px 0px;
 }
 
@@ -42,13 +42,14 @@ h1 {
     font-size: 18px;
     outline: none;
     border: 1px solid #808080;
+    border-radius: 5px;
     margin-top: 10px;
     margin-bottom: 20px;
     padding: 0px 18px;
 }
 
 .input-cuaca input:focus {
-    border: 1px solid #a6c1ee;
+    border: 1px solid #724ae8;
     padding: 0px 18px;
 }
 
@@ -79,13 +80,13 @@ h1 {
     border-radius: 5px;
     font-size: 18px;
     color: white;
-    background: #a6c1ee;
+    background: #724ae8;
     transition: 0.3s ease;
     padding: 10px 0px;
 }
 
 .input-cuaca .search-btn:hover {
-    background: #7ea7ed;
+    background: #5f31e8;
 }
 
 .input-cuaca .location-btn {
@@ -103,7 +104,7 @@ h1 {
 .data-cuaca .cuaca-terakhir {
     display: flex;
     color: white;
-    background: #a6c1ee;
+    background: #724ae8;
     border-radius: 5px;
     justify-content: space-between;
     padding: 20px 70px 20px 20px;
@@ -147,7 +148,7 @@ h1 {
 .kartu-cuaca .card {
     color: white;
     background: #808080;
-    width: calc(100% / 6);
+    width: calc(100% / 5);
     list-style: none;
     border-radius: 5px;
     padding: 20px 18px;
