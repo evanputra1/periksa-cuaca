@@ -1,0 +1,212 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Open+Sans:wght@300;400;500;600;700;800&family=Poppins:wght@400;500;600;700;800&display=swap');
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Poppins', sans-serif;
+  }
+  
+body {
+    background: #E3F2FD;
+    /* background: linear-gradient(to top, #fbc2eb 0%, #a6c1ee 100%);
+    height: 100vh; */
+}
+
+h1 {
+    background: #a6c1ee;
+    box-shadow: 0px 0px 25px 0px rgba(0,0,0,0.5);
+    font-size: 28px;
+    text-align: center;
+    color: #212121;
+    padding: 15px 0px;
+}
+
+.container {
+    display: flex;
+    gap: 35px;
+    padding: 30px;
+}
+
+.input-cuaca {
+    width: 550px;
+}
+
+.input-cuaca h3 {
+    color: #212121;
+}
+
+.input-cuaca input {
+    height: 45px;
+    width: 100%;
+    font-size: 18px;
+    outline: none;
+    border: 1px solid #808080;
+    margin-top: 10px;
+    margin-bottom: 20px;
+    padding: 0px 18px;
+}
+
+.input-cuaca input:focus {
+    border: 1px solid #a6c1ee;
+    padding: 0px 18px;
+}
+
+.input-cuaca .pemisah {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #808080;
+    height: 2px;
+    width: 100%;
+    margin: 25px 0px;
+}
+
+.input-cuaca .pemisah::before {
+    content: "or";
+    color: #808080;
+    font-size: 20px;
+    background: #E3F2FD;
+    padding: 0px 16px;
+    margin-top: -5px;
+}
+
+.input-cuaca button {
+    width: 100%;
+    cursor: pointer;
+    outline: none;
+    border: none;
+    border-radius: 5px;
+    font-size: 18px;
+    color: white;
+    background: #a6c1ee;
+    transition: 0.3s ease;
+    padding: 10px 0px;
+}
+
+.input-cuaca .search-btn:hover {
+    background: #7ea7ed;
+}
+
+.input-cuaca .location-btn {
+    background: #808080;
+}
+
+.input-cuaca .location-btn:hover {
+    background: #666666;
+}
+
+.data-cuaca {
+    width: 100%;
+}
+
+.data-cuaca .cuaca-terakhir {
+    display: flex;
+    color: white;
+    background: #a6c1ee;
+    border-radius: 5px;
+    justify-content: space-between;
+    padding: 20px 70px 20px 20px;
+}
+
+.data-cuaca h6 {
+    font-weight: 500;
+    font-size: 16px;
+    margin-top: 12px;
+}
+
+.cuaca-terakhir h2 {
+    font-weight: 700;
+    font-size: 28px;
+}
+
+.cuaca-terakhir .icon {
+    text-align: center;
+}
+
+.cuaca-terakhir .icon img {
+    max-width: 120px;
+    margin-top: -15px;
+}
+
+.cuaca-terakhir .icon h6 {
+    margin-top: -10px;
+    text-transform: capitalize;
+}
+
+.hari-kedepan h2 {
+    font-size: 24px;
+    margin: 20px 0px;
+}
+
+.hari-kedepan .kartu-cuaca {
+    display: flex;
+    gap: 20px;
+}
+
+.kartu-cuaca .card {
+    color: white;
+    background: #808080;
+    width: calc(100% / 6);
+    list-style: none;
+    border-radius: 5px;
+    padding: 20px 18px;
+}
+
+.kartu-cuaca .card h3 {
+    font-size: 20px;
+    font-weight: 600;
+}
+
+.kartu-cuaca .card img {
+    max-width: 80px;
+    margin-top: 5px;
+    margin-bottom: -12px;
+}
+
+@media (max-width: 1400px) {
+
+    .data-cuaca .cuaca-terakhir {
+        padding: 20px;
+    }
+
+    .kartu-cuaca {
+        flex-wrap: wrap;
+    }
+
+    .kartu-cuaca .card {
+        width: calc(100% / 4 - 15px);
+    }
+}
+
+@media (max-width: 1200px) {
+    .kartu-cuaca .card {
+        width: calc(100% / 3 - 15px);
+    }
+}
+
+@media (max-width: 950px) {
+    .input-cuaca {
+      width: 450px;
+    }
+    .kartu-cuaca .card {
+      width: calc(100% / 2 - 10px);
+    }
+}
+
+@media (max-width: 750px) {
+    h1 {
+      font-size: 1.45rem;
+      padding: 16px 0;
+    }
+    .container {
+      flex-wrap: wrap;
+      padding: 15px;
+    }
+    .input-cuaca {
+      width: 100%;
+    }
+    .data-cuaca h2 {
+      font-size: 1.35rem;
+    }
+}
