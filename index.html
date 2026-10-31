@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,62 +11,83 @@
     <h1 class="header">Test Aplikasi Periksa Cuaca</h1>
     <div class="container">
         <div class="input-cuaca">
-            <h3>Masukkan Nama Kota</h3>
-            <input class="input-kota" type="text" placeholder="Bekasi, Jakarta, Bandung...">
-            <button class="search-btn">Search</button>
+            <h3><label for="input-kota">Masukkan Nama Kota</label></h3>
+            <div class="kolom-cari">
+                <input id="input-kota" name="kota" class="input-kota" type="text"
+                       placeholder="Bekasi, Jakarta, Bandung..." autocomplete="off"
+                       role="combobox" aria-autocomplete="list" aria-expanded="false"
+                       aria-controls="daftar-saran" aria-describedby="petunjuk-saran">
+                <p id="petunjuk-saran" class="visually-hidden">Ketik minimal dua huruf. Pilih kota memakai tombol panah atas dan bawah, lalu Enter.</p>
+                <ul id="daftar-saran" class="daftar-saran" role="listbox" aria-label="Saran kota" hidden></ul>
+            </div>
+            <p id="status-saran" class="visually-hidden" role="status" aria-live="polite"></p>
+            <button type="button" class="search-btn">Search</button>
             <div class="pemisah"></div>
-            <button class="location-btn">Gunakan Lokasi Terakhir</button>
+            <button type="button" class="location-btn">Gunakan Lokasi Saya</button>
+            <div class="satuan" role="group" aria-label="Satuan suhu dan angin">
+                <span class="satuan-label">Satuan</span>
+                <button type="button" class="satuan-btn" data-unit="metric" aria-pressed="true">°C · m/s</button>
+                <button type="button" class="satuan-btn" data-unit="imperial" aria-pressed="false">°F · mph</button>
+            </div>
         </div>
-        <div class="data-cuaca">
+        <div class="data-cuaca" aria-live="polite">
+            <div class="pesan" id="pesan" hidden>
+                <span class="pesan-teks" id="pesan-teks"></span>
+                <button type="button" class="pesan-coba" id="pesan-coba" hidden>Coba lagi</button>
+                <button type="button" class="pesan-tutup" id="pesan-tutup" aria-label="Tutup pesan">&times;</button>
+            </div>
+            <p class="diperbarui" id="diperbarui"></p>
             <div class="cuaca-terakhir">
                 <div class="detail">
                     <h2>_______ ( ______ )</h2>
                     <h6>Suhu: __°C</h6>
                     <h6>Angin: __ M/S</h6>
-                    <h6>Kelembapan: __%</h6>        
+                    <h6>Kelembapan: __%</h6>
+                    <h6>Kualitas Udara: <span class="nilai-udara" id="nilai-udara">__</span></h6>
                 </div>
             </div>
             <div class="hari-kedepan">
-                <h2> Perkiraan 5-Hari Kedepan</h2>
-                <ul class="kartu-cuaca">
+                <h2 class="judul-ramalan">Perkiraan 5-Hari Kedepan</h2>
+                <ul class="kartu-cuaca" role="list">
                   <li class="card">
                     <h3>( ______ )</h3>
-                    <h6>Suhu: __C</h6>
+                    <h6>Suhu: __°C</h6>
                     <h6>Angin: __ M/S</h6>
                     <h6>Kelembapan: __%</h6>
                   </li>
                   <li class="card">
                     <h3>( ______ )</h3>
-                    <h6>Suhu: __C</h6>
+                    <h6>Suhu: __°C</h6>
                     <h6>Angin: __ M/S</h6>
                     <h6>Kelembapan: __%</h6>
                   </li>
                   <li class="card">
                     <h3>( ______ )</h3>
-                    <h6>Suhu: __C</h6>
+                    <h6>Suhu: __°C</h6>
                     <h6>Angin: __ M/S</h6>
                     <h6>Kelembapan: __%</h6>
                   </li>
                   <li class="card">
                     <h3>( ______ )</h3>
-                    <h6>Suhu: __C</h6>
+                    <h6>Suhu: __°C</h6>
                     <h6>Angin: __ M/S</h6>
                     <h6>Kelembapan: __%</h6>
                   </li>
                   <li class="card">
                     <h3>( ______ )</h3>
-                    <h6>Suhu: __C</h6>
+                    <h6>Suhu: __°C</h6>
                     <h6>Angin: __ M/S</h6>
                     <h6>Kelembapan: __%</h6>
                   </li>
-                  <!-- <li class="card">
-                    <h3>( ______ )</h3>
-                    <h6>Suhu: __C</h6>
-                    <h6>Angin: __ M/S</h6>
-                    <h6>Kelembapan: __%</h6>
-                  </li> -->
                 </ul>
             </div>
+            <section class="rincian" id="rincian" hidden aria-labelledby="rincian-judul">
+                <div class="rincian-kepala">
+                    <h3 id="rincian-judul"></h3>
+                    <button type="button" class="rincian-tutup" id="rincian-tutup" aria-label="Tutup rincian">&times;</button>
+                </div>
+                <ul class="rincian-daftar" id="rincian-daftar"></ul>
+            </section>
         </div>
     </div>
     <!-- Javascript -->
