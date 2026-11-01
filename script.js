@@ -35,7 +35,6 @@ const paintAirValue = () => {
     else node.removeAttribute("title");
 };
 const suggestionStatus = document.querySelector("#status-saran");
-const updatedLabel = document.querySelector("#diperbarui");
 const notice = document.querySelector("#pesan");
 const noticeText = document.querySelector("#pesan-teks");
 const noticeRetry = document.querySelector("#pesan-coba");
@@ -188,17 +187,6 @@ const formatTime = (unixSeconds, offsetSeconds) => {
     const hours = String(hasOffset ? date.getUTCHours() : date.getHours()).padStart(2, "0");
     const minutes = String(hasOffset ? date.getUTCMinutes() : date.getMinutes()).padStart(2, "0");
     return `${hours}.${minutes}`;
-};
-
-// "12 menit lalu" untuk penanda kapan data terakhir diambil.
-const formatRelative = (timestamp) => {
-    const value = toNumber(timestamp);
-    if (!Number.isFinite(value)) return "";
-
-    const minutes = Math.max(0, Math.round((Date.now() - value) / 60000));
-    if (minutes < 1) return "baru saja";
-    if (minutes < 60) return `${minutes} menit lalu`;
-    return `${Math.round(minutes / 60)} jam lalu`;
 };
 
 // ============================================================
@@ -494,25 +482,10 @@ const renderAll = (view, options = {}) => {
             : "Perkiraan Cuaca";
     }
 
-    if (updatedLabel) {
-        updatedLabel.textContent = view.at ? `Diperbarui ${formatRelative(view.at)}` : "";
-    }
-
     paintAirValue();
 
     if (options.keepOpen && Number.isInteger(view.openDayIndex)) openDetails(view.openDayIndex);
     else closeDetails();
-};
-
-// Perbarui label "Diperbarui …" tanpa merender ulang seluruh kartu.
-const refreshUpdatedLabel = () => {
-    if (!updatedLabel) return;
-
-    if (!activeView || !activeView.at) {
-        updatedLabel.textContent = "";
-        return;
-    }
-    updatedLabel.textContent = `Diperbarui ${formatRelative(activeView.at)}`;
 };
 
 // Ganti satuan tanpa mengambil ulang data dari API.
@@ -614,7 +587,11 @@ const getWeatherDetails = async (cityName, latitude, longitude, token) => {
 
     // Tanggal hari ini tidak diulang sebagai kartu (sudah ada di kartu besar).
     const view = {
-        cityName: hasCurrent && currentData.name ? String(currentData.name) : cityName,
+        // Nama yang dipilih pengguna lebih dipercaya daripada `name` dari
+        // /weather: endpoint itu mengembalikan nama tempat TERDEKAT dari titik
+        // koordinat (contoh: koordinat Bekasi bisa dilaporkan "Bulanbulan").
+        cityName: String(cityName || "").trim()
+            || (hasCurrent && currentData.name ? String(currentData.name) : DEFAULT_CITY_NAME),
         todayLabel,
         timezone,
         latitude,
@@ -1178,11 +1155,6 @@ window.addEventListener("offline", () => {
         retry: lastLocation ? () => reloadLast() : null,
     });
 });
-
-// Label "Diperbarui …" ikut menua walau tidak ada render baru.
-if (typeof window.setInterval === "function") {
-    window.setInterval(refreshUpdatedLabel, 30000);
-}
 
 // Pulihkan satuan dan kota terakhir dari localStorage.
 const restorePreferences = () => {
