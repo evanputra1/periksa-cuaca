@@ -1,0 +1,26 @@
+@import "tailwindcss" source(none);
+
+@source "../index.html";
+@source "../script.js";
+
+@theme {
+  --font-sans: "Poppins", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --color-page: #e3f2fd;
+  --color-brand: #724ae8;
+  --color-brand-hover: #5f31e8;
+  --color-brand-soft: #7f5aef;
+  --color-tile: #808080;
+
+  --color-aqi-hijau: #9df5a8;
+  --color-aqi-kuning: #ffe066;
+  --color-aqi-oranye: #ffb74d;
+  --color-aqi-merah: #ff8a80;
+  --color-aqi-ungu: #f3a6ff;
+}
+
+@layer base {
+  body {
+    font-family: var(--font-sans);
+  }
+}

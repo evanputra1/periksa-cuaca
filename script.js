@@ -14,10 +14,12 @@ const suggestionList = document.querySelector("#daftar-saran");
 // disimpan di state dan baru ditempel ke <span> hasil render terbaru.
 let airValueState = { text: "__", tone: null, title: null };
 
+const AIR_VALUE_CLASSES = "font-semibold data-[tone=hijau]:text-aqi-hijau data-[tone=kuning]:text-aqi-kuning data-[tone=oranye]:text-aqi-oranye data-[tone=merah]:text-aqi-merah data-[tone=ungu]:text-aqi-ungu";
+
 const airValueMarkup = () => {
     const tone = airValueState.tone ? ` data-tone="${escapeHtml(airValueState.tone)}"` : "";
     const title = airValueState.title ? ` title="${escapeHtml(airValueState.title)}"` : "";
-    return `<span class="nilai-udara" id="nilai-udara"${tone}${title}>${escapeHtml(airValueState.text)}</span>`;
+    return `<span class="${AIR_VALUE_CLASSES}" id="nilai-udara"${tone}${title}>${escapeHtml(airValueState.text)}</span>`;
 };
 
 const paintAirValue = () => {
@@ -341,18 +343,23 @@ const reportError = (context, error, retry) => {
 };
 
 // Ikon + deskripsi cuaca dari satu entri API.
-const buildIcon = (weatherItem) => {
+const buildIcon = (weatherItem, variant = "card") => {
     const weather = (weatherItem && weatherItem.weather && weatherItem.weather[0]) || {};
     const description = weather.description || "";
     const iconUrl = weather.icon
         ? `https://openweathermap.org/img/wn/${escapeHtml(weather.icon)}@4x.png`
         : "";
     const altText = escapeHtml(description || "Ikon cuaca");
+    // Ukuran ikon berbeda antara kartu besar dan kartu harian.
+    const imgClass = variant === "main"
+        ? "-mt-[15px] max-w-[120px]"
+        : "-mb-[12px] mt-[5px] max-w-[80px] min-[1321px]:max-[1700px]:max-w-[72px]";
+
     // Tanpa ikon, jangan hasilkan <img src=""> (browser akan meminta ulang
     // halaman itu sendiri dan menampilkan gambar rusak).
     return {
         description,
-        iconMarkup: iconUrl ? `<img src="${iconUrl}" alt="${altText}">` : "",
+        iconMarkup: iconUrl ? `<img src="${iconUrl}" alt="${altText}" class="${imgClass}">` : "",
     };
 };
 
@@ -367,18 +374,19 @@ const buildMainCard = (view) => {
     const current = view.current || {};
     const main = current.main || {};
     const wind = current.wind || {};
-    const { description, iconMarkup } = buildIcon(current);
+    const { description, iconMarkup } = buildIcon(current, "main");
+    const line = "mt-3 text-[16px] font-medium";
 
-    return `<div class="detail">
-                <h2>${escapeHtml(view.cityName)} (${escapeHtml(view.todayLabel)})</h2>
-                <h6>Suhu: ${formatTemperature(main.temp)}</h6>
-                <h6>Angin: ${formatWindSpeed(wind.speed)}</h6>
-                <h6>Kelembapan: ${formatHumidity(main.humidity)}</h6>
-                <h6>Kualitas Udara: ${airValueMarkup()}</h6>
+    return `<div>
+                <h2 class="text-[28px] font-bold max-[750px]:text-[1.35rem]">${escapeHtml(view.cityName)} (${escapeHtml(view.todayLabel)})</h2>
+                <h6 class="${line}">Suhu: ${formatTemperature(main.temp)}</h6>
+                <h6 class="${line}">Angin: ${formatWindSpeed(wind.speed)}</h6>
+                <h6 class="${line}">Kelembapan: ${formatHumidity(main.humidity)}</h6>
+                <h6 class="${line}">Kualitas Udara: ${airValueMarkup()}</h6>
             </div>
-            <div class="icon">
+            <div class="icon text-center">
                 ${iconMarkup}
-                <h6>${escapeHtml(description)}</h6>
+                <h6 class="-mt-[10px] text-[16px] font-medium capitalize">${escapeHtml(description)}</h6>
             </div>`;
 };
 
@@ -387,17 +395,18 @@ const buildDayCard = (view, day, index) => {
     const main = (day.item && day.item.main) || {};
     const wind = (day.item && day.item.wind) || {};
     const { iconMarkup } = buildIcon(day.item);
+    const line = "mt-3 text-[16px] font-medium min-[1321px]:max-[1700px]:text-[13px] max-[750px]:text-[15px]";
 
     // <button> hanya boleh berisi phrasing content, jadi heading tidak boleh
     // dibungkus tombol. Tombol dibuat sebagai lapisan transparan di atas kartu.
-    return `<li class="card">
-                <h3>(${escapeHtml(day.dayLabel)})</h3>
+    return `<li class="card relative cursor-pointer list-none rounded-[5px] bg-tile p-[20px_18px] text-white min-[1321px]:max-[1700px]:p-[16px_12px] max-[750px]:p-[16px_14px]">
+                <h3 class="text-[20px] font-semibold min-[1321px]:max-[1700px]:text-[18px] max-[750px]:text-[18px]">(${escapeHtml(day.dayLabel)})</h3>
                 ${iconMarkup}
-                <h6>Suhu: ${formatTemperature(main.temp)}</h6>
-                <h6>Angin: ${formatWindSpeed(wind.speed)}</h6>
-                <h6>Kelembapan: ${formatHumidity(main.humidity)}</h6>
-                <button type="button" class="card-tombol" data-day-index="${index}" aria-expanded="false" aria-controls="rincian">
-                    <span class="visually-hidden">Tampilkan rincian cuaca ${escapeHtml(day.dayLabel)}</span>
+                <h6 class="${line}">Suhu: ${formatTemperature(main.temp)}</h6>
+                <h6 class="${line}">Angin: ${formatWindSpeed(wind.speed)}</h6>
+                <h6 class="${line}">Kelembapan: ${formatHumidity(main.humidity)}</h6>
+                <button type="button" class="card-tombol absolute inset-0 h-full w-full cursor-pointer rounded-[5px] border-0 bg-transparent p-0 text-left [font:inherit] focus-visible:outline-3 focus-visible:outline-offset-[-3px] focus-visible:outline-[#ffd166]" data-day-index="${index}" aria-expanded="false" aria-controls="rincian">
+                    <span class="sr-only">Tampilkan rincian cuaca ${escapeHtml(day.dayLabel)}</span>
                 </button>
             </li>`;
 };
@@ -405,14 +414,21 @@ const buildDayCard = (view, day, index) => {
 // ============================================================
 // Rincian per 3 jam
 // ============================================================
+// Penanda kartu yang sedang dibuka: utility Tailwind, bukan kelas CSS sendiri.
+const CARD_ACTIVE_CLASSES = ["bg-brand-soft", "shadow-[0_0_0_3px_rgba(255,209,102,0.9)]"];
+
+const setCardActive = (card, isActive) => {
+    if (!card) return;
+    CARD_ACTIVE_CLASSES.forEach((className) => card.classList.toggle(className, isActive));
+};
+
 const closeDetails = () => {
     if (detailPanel) detailPanel.hidden = true;
     if (activeView) activeView.openDayIndex = null;
 
     weatherCardsDiv.querySelectorAll(".card-tombol").forEach((button) => {
         button.setAttribute("aria-expanded", "false");
-        const card = button.closest(".card");
-        if (card) card.classList.remove("card-aktif");
+        setCardActive(button.closest(".card"), false);
     });
 };
 
@@ -426,10 +442,10 @@ const openDetails = (index) => {
     detailList.innerHTML = day.items.map((item) => {
         const main = (item && item.main) || {};
         const weather = (item && item.weather && item.weather[0]) || {};
-        return `<li>
-                    <span class="jam">${formatTime(item && item.dt, activeView.timezone)}</span>
-                    <span class="suhu">${formatTemperature(main.temp)}</span>
-                    <span class="ket">${escapeHtml(weather.description || "—")}</span>
+        return `<li class="rounded-md bg-[#f4f1ff] px-3 py-2.5">
+                    <span class="block text-[13px] font-semibold text-[#4a3f7a]">${formatTime(item && item.dt, activeView.timezone)}</span>
+                    <span class="mt-0.5 block text-[16px] font-semibold text-[#212121]">${formatTemperature(main.temp)}</span>
+                    <span class="block text-[12px] text-[#4d4d4d]">${escapeHtml(weather.description || "—")}</span>
                 </li>`;
     }).join("");
 
@@ -451,8 +467,7 @@ const openDetails = (index) => {
     weatherCardsDiv.querySelectorAll(".card-tombol").forEach((button) => {
         const isOpen = toNumber(button.dataset.dayIndex) === index;
         button.setAttribute("aria-expanded", isOpen ? "true" : "false");
-        const card = button.closest(".card");
-        if (card) card.classList.toggle("card-aktif", isOpen);
+        setCardActive(button.closest(".card"), isOpen);
     });
 };
 
@@ -815,11 +830,12 @@ const renderSuggestions = (entries, emptyMessage) => {
 
     if (entries.length === 0) {
         const message = emptyMessage || "Kota tidak ditemukan.";
-        suggestionList.innerHTML = `<li class="saran-status" role="option" aria-disabled="true">${escapeHtml(message)}</li>`;
+        suggestionList.innerHTML = `<li class="cursor-default px-4 py-3 text-[14px] text-[#5f5f5f] hover:bg-transparent" role="option" aria-disabled="true">${escapeHtml(message)}</li>`;
         setSuggestionStatus(message);
     } else {
         suggestionList.innerHTML = entries.map((entry, index) => `
-            <li id="saran-${index}" data-index="${index}" role="option" aria-selected="false">
+            <li id="saran-${index}" data-index="${index}" role="option" aria-selected="false"
+                class="cursor-pointer border-b border-[#f0edf8] px-4 py-3 text-[15px] text-[#212121] last:border-b-0 hover:bg-[#efe9ff] aria-selected:bg-[#efe9ff]">
                 ${escapeHtml(entry.label)}
             </li>`).join("");
         setSuggestionStatus(`${entries.length} kota ditemukan. Gunakan panah atas atau bawah lalu Enter untuk memilih.`);
