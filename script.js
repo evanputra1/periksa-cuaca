@@ -10,30 +10,43 @@ const currentWeatherDiv = document.querySelector(".cuaca-terakhir");
 const weatherCardsDiv = document.querySelector(".kartu-cuaca");
 const forecastTitle = document.querySelector(".judul-ramalan");
 const suggestionList = document.querySelector("#daftar-saran");
-// Kartu cuaca utama digambar ulang tiap pencarian, jadi teks kualitas udara
-// disimpan di state dan baru ditempel ke <span> hasil render terbaru.
-let airValueState = { text: "__", tone: null, title: null };
+// Kartu cuaca utama digambar ulang tiap pencarian, jadi nilai berwarna
+// (kualitas udara, indeks UV, polen) disimpan di state dan baru ditempel ke
+// <span> hasil render terbaru. Semua memakai mekanisme yang sama.
+const createToneState = () => ({ text: "__", tone: null, title: null });
 
-const AIR_VALUE_CLASSES = "font-semibold data-[tone=hijau]:text-aqi-hijau data-[tone=kuning]:text-aqi-kuning data-[tone=oranye]:text-aqi-oranye data-[tone=merah]:text-aqi-merah data-[tone=ungu]:text-aqi-ungu";
+let airValueState = createToneState();
+let uvValueState = createToneState();
+let pollenValueState = createToneState();
 
-const airValueMarkup = () => {
-    const tone = airValueState.tone ? ` data-tone="${escapeHtml(airValueState.tone)}"` : "";
-    const title = airValueState.title ? ` title="${escapeHtml(airValueState.title)}"` : "";
-    return `<span class="${AIR_VALUE_CLASSES}" id="nilai-udara"${tone}${title}>${escapeHtml(airValueState.text)}</span>`;
+// Warna mengikuti atribut data-tone; tokennya ada di src/tailwind.css.
+const TONE_CLASSES = "font-semibold data-[tone=hijau]:text-aqi-hijau data-[tone=kuning]:text-aqi-kuning data-[tone=oranye]:text-aqi-oranye data-[tone=merah]:text-aqi-merah data-[tone=ungu]:text-aqi-ungu";
+
+const toneMarkup = (id, state) => {
+    const tone = state.tone ? ` data-tone="${escapeHtml(state.tone)}"` : "";
+    const title = state.title ? ` title="${escapeHtml(state.title)}"` : "";
+    return `<span class="${TONE_CLASSES}" id="${id}"${tone}${title}>${escapeHtml(state.text)}</span>`;
 };
 
-const paintAirValue = () => {
-    const node = document.querySelector("#nilai-udara");
+const paintTone = (id, state) => {
+    const node = document.querySelector(`#${id}`);
     if (!node) return;
 
-    node.textContent = airValueState.text;
+    node.textContent = state.text;
 
-    if (airValueState.tone) node.setAttribute("data-tone", airValueState.tone);
+    if (state.tone) node.setAttribute("data-tone", state.tone);
     else node.removeAttribute("data-tone");
 
-    if (airValueState.title) node.setAttribute("title", airValueState.title);
+    if (state.title) node.setAttribute("title", state.title);
     else node.removeAttribute("title");
 };
+
+const airValueMarkup = () => toneMarkup("nilai-udara", airValueState);
+const paintAirValue = () => paintTone("nilai-udara", airValueState);
+const uvValueMarkup = () => toneMarkup("nilai-uv", uvValueState);
+const paintUvValue = () => paintTone("nilai-uv", uvValueState);
+const pollenValueMarkup = () => toneMarkup("nilai-polen", pollenValueState);
+const paintPollenValue = () => paintTone("nilai-polen", pollenValueState);
 const suggestionStatus = document.querySelector("#status-saran");
 const notice = document.querySelector("#pesan");
 const noticeText = document.querySelector("#pesan-teks");
@@ -62,6 +75,39 @@ const AIR_QUALITY_LEVELS = {
     4: { label: "Buruk", tone: "merah", verdict: "Kualitas udara buruk. Kurangi aktivitas di luar ruangan dan pakai masker bila keluar." },
     5: { label: "Sangat buruk", tone: "ungu", verdict: "Kualitas udara sangat buruk. Hindari aktivitas di luar ruangan." },
 };
+
+// Indeks UV memakai skala WHO (0-2 rendah ... 11+ ekstrem).
+const UV_LEVELS = [
+    { max: 2.999, label: "Rendah", tone: "hijau", verdict: "Tidak perlu pelindung khusus." },
+    { max: 5.999, label: "Sedang", tone: "kuning", verdict: "Pakai tabir surya dan kacamata bila beraktivitas lama di luar." },
+    { max: 7.999, label: "Tinggi", tone: "oranye", verdict: "Lindungi kulit: tabir surya, topi, dan hindari matahari siang." },
+    { max: 10.999, label: "Sangat Tinggi", tone: "merah", verdict: "Risiko terbakar tinggi. Batasi paparan matahari pukul 10.00-16.00." },
+    { max: Infinity, label: "Ekstrem", tone: "ungu", verdict: "Hindari paparan matahari langsung; kulit bisa terbakar dalam hitungan menit." },
+];
+
+// Polen (serbuk sari). Open-Meteo mengirim konsentrasi per jenis tumbuhan
+// dalam butir/m³; ambang di bawah adalah perkiraan yang lazim dipakai.
+const POLLEN_TYPES = [
+    { key: "grass_pollen", label: "Rumput" },
+    { key: "birch_pollen", label: "Birch" },
+    { key: "alder_pollen", label: "Alder" },
+    { key: "olive_pollen", label: "Zaitun" },
+    { key: "mugwort_pollen", label: "Mugwort" },
+    { key: "ragweed_pollen", label: "Ragweed" },
+];
+
+const POLLEN_LEVELS = [
+    { max: 9.999, label: "Rendah", tone: "hijau" },
+    { max: 49.999, label: "Sedang", tone: "kuning" },
+    { max: 199.999, label: "Tinggi", tone: "oranye" },
+    { max: Infinity, label: "Sangat Tinggi", tone: "merah" },
+];
+
+// Arah angin: derajat (0 = dari Utara) -> 16 mata angin.
+const COMPASS_POINTS = [
+    "Utara", "Timur Laut", "Timur", "Tenggara",
+    "Selatan", "Barat Daya", "Barat", "Barat Laut",
+];
 
 // Autocomplete kota: nama kota tidak unik, jadi tampilkan beberapa kandidat.
 const SUGGESTION_LIMIT = 5;
@@ -170,6 +216,15 @@ const formatWindSpeed = (metersPerSecond) => {
 
     const converted = units === "imperial" ? value * 2.2369362921 : value;
     return `${Math.round(converted * 10) / 10} ${label}`;
+};
+
+// Derajat angin -> mata angin ("Timur Laut"); kosong bila data tidak ada.
+const describeWindDirection = (degrees) => {
+    const value = toNumber(degrees);
+    if (!Number.isFinite(value)) return "";
+
+    const normalized = ((value % 360) + 360) % 360;
+    return COMPASS_POINTS[Math.round(normalized / 45) % COMPASS_POINTS.length];
 };
 
 // Jam menurut zona waktu kota (offset detik dari UTC).
@@ -357,20 +412,34 @@ const formatHumidity = (value) => {
     return Number.isFinite(humidityValue) ? `${humidityValue}%` : "--%";
 };
 
+// Tekanan udara (hPa) siap tampil.
+const formatPressure = (value) => {
+    const pressure = toNumber(value);
+    return Number.isFinite(pressure) && pressure > 0 ? `${Math.round(pressure)} hPa` : "-- hPa";
+};
+
 // Kartu besar: kondisi cuaca SAAT INI (endpoint /weather).
+// Delapan keterangan disusun dua kolom supaya kartu tidak memanjang ke bawah.
 const buildMainCard = (view) => {
     const current = view.current || {};
     const main = current.main || {};
     const wind = current.wind || {};
     const { description, iconMarkup } = buildIcon(current, "main");
-    const line = "mt-3 text-[16px] font-medium";
+    const windDirection = describeWindDirection(wind.deg);
+    const line = "text-[16px] font-medium max-[750px]:text-[15px]";
 
-    return `<div>
+    return `<div class="min-w-0">
                 <h2 class="text-[28px] font-bold max-[750px]:text-[1.35rem]">${escapeHtml(view.cityName)} (${escapeHtml(view.todayLabel)})</h2>
-                <h6 class="${line}">Suhu: ${formatTemperature(main.temp)}</h6>
-                <h6 class="${line}">Angin: ${formatWindSpeed(wind.speed)}</h6>
-                <h6 class="${line}">Kelembapan: ${formatHumidity(main.humidity)}</h6>
-                <h6 class="${line}">Kualitas Udara: ${airValueMarkup()}</h6>
+                <div class="mt-3 grid grid-cols-2 gap-x-8 gap-y-1.5 max-[600px]:grid-cols-1">
+                    <h6 class="${line}">Suhu: ${formatTemperature(main.temp)}</h6>
+                    <h6 class="${line}">Terasa Seperti: ${formatTemperature(main.feels_like)}</h6>
+                    <h6 class="${line}">Angin: ${formatWindSpeed(wind.speed)}${windDirection ? ` (${escapeHtml(windDirection)})` : ""}</h6>
+                    <h6 class="${line}">Kelembapan: ${formatHumidity(main.humidity)}</h6>
+                    <h6 class="${line}">Tekanan Udara: ${formatPressure(main.pressure)}</h6>
+                    <h6 class="${line}">Kualitas Udara: ${airValueMarkup()}</h6>
+                    <h6 class="${line}">Indeks UV: ${uvValueMarkup()}</h6>
+                    <h6 class="${line}">Polen: ${pollenValueMarkup()}</h6>
+                </div>
             </div>
             <div class="icon text-center">
                 ${iconMarkup}
@@ -483,6 +552,8 @@ const renderAll = (view, options = {}) => {
     }
 
     paintAirValue();
+    paintUvValue();
+    paintPollenValue();
 
     if (options.keepOpen && Number.isInteger(view.openDayIndex)) openDetails(view.openDayIndex);
     else closeDetails();
@@ -614,6 +685,8 @@ const getWeatherDetails = async (cityName, latitude, longitude, token) => {
     // Baru sekarang kartu disentuh: bila salah satu pemeriksaan di atas
     // gagal, kartu lama tetap utuh dan tidak tertinggal di "Memuat…".
     showAirQualityMessage("Memuat…");
+    showUvMessage("Memuat…");
+    showPollenMessage("Memuat…");
     activeView = view;
     cityInput.value = "";
     renderAll(view);
@@ -627,8 +700,9 @@ const getWeatherDetails = async (cityName, latitude, longitude, token) => {
     };
     writeStorage();
 
-    // Tidak di-await: cuaca sudah tampil walau kualitas udara masih dimuat.
+    // Tidak di-await: cuaca sudah tampil walau data tambahan masih dimuat.
     loadAirQuality(latitude, longitude, token);
+    loadEnvironment(latitude, longitude, token);
 };
 
 // ============================================================
@@ -693,6 +767,95 @@ const loadAirQuality = async (latitude, longitude, token) => {
         if (isStale(token)) return;
         showAirQualityMessage("Tidak tersedia");
     }
+};
+
+// ============================================================
+// Indeks UV & polen
+// ============================================================
+
+const showUvMessage = (message, title = null) => {
+    uvValueState = { text: message, tone: null, title };
+    paintUvValue();
+};
+
+const showPollenMessage = (message, title = null) => {
+    pollenValueState = { text: message, tone: null, title };
+    paintPollenValue();
+};
+
+// Tingkat pertama yang belum terlampaui nilainya.
+const levelFor = (levels, value) => levels.find((level) => value <= level.max) || levels[levels.length - 1];
+
+const renderUvIndex = (payload) => {
+    // Endpoint /uvi mengirim { value }; versi lama mengirim { data }.
+    const raw = payload && typeof payload === "object"
+        ? (payload.value !== undefined ? payload.value : payload.data)
+        : payload;
+    const value = toNumber(raw);
+
+    if (!Number.isFinite(value) || value < 0) {
+        showUvMessage("Tidak tersedia");
+        return;
+    }
+
+    const level = levelFor(UV_LEVELS, value);
+    const rounded = Math.round(value * 10) / 10;
+
+    // "13.3 (Ekstrem)" tanpa angka mentah yang panjang.
+    uvValueState = {
+        text: `${rounded} (${level.label})`,
+        tone: level.tone,
+        title: `Indeks UV ${rounded} · ${level.verdict}`,
+    };
+    paintUvValue();
+};
+
+const renderPollen = (payload) => {
+    const current = payload && payload.current && typeof payload.current === "object"
+        ? payload.current
+        : null;
+
+    // null berarti wilayah itu di luar cakupan data (mis. Indonesia).
+    const readings = POLLEN_TYPES
+        .map((type) => ({ ...type, value: toNumber(current ? current[type.key] : NaN) }))
+        .filter((type) => Number.isFinite(type.value) && type.value >= 0);
+
+    if (readings.length === 0) {
+        showPollenMessage("Tidak tersedia", "Data polen baru tersedia untuk Eropa (sumber CAMS via Open-Meteo).");
+        return;
+    }
+
+    const highest = readings.reduce((worst, type) => (type.value > worst.value ? type : worst));
+    const level = levelFor(POLLEN_LEVELS, highest.value);
+
+    pollenValueState = {
+        text: level.label,
+        tone: level.tone,
+        title: `Tertinggi: ${highest.label} ${Math.round(highest.value)} butir/m³ · ambang perkiraan, bukan angka resmi`,
+    };
+    paintPollenValue();
+};
+
+// UV dari OpenWeatherMap, polen dari Open-Meteo (gratis, tanpa API key).
+// Dimuat terpisah dari cuaca supaya kegagalan salah satu tidak menghalangi
+// ramalan maupun nilai tambahan lainnya.
+const loadEnvironment = async (latitude, longitude, token) => {
+    const UV_API_URL = `https://api.openweathermap.org/data/2.5/uvi?lat=${encodeURIComponent(latitude)}&lon=${encodeURIComponent(longitude)}&appid=${API_KEY}`;
+    const pollenKeys = POLLEN_TYPES.map((type) => type.key).join(",");
+    const POLLEN_API_URL = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${encodeURIComponent(latitude)}&longitude=${encodeURIComponent(longitude)}&current=${pollenKeys}&timezone=auto`;
+
+    const [uvResult, pollenResult] = await Promise.allSettled([
+        requestJson(UV_API_URL, { timeoutMs: REQUEST_TIMEOUT_MS }),
+        requestJson(POLLEN_API_URL, { timeoutMs: REQUEST_TIMEOUT_MS }),
+    ]);
+
+    if (isStale(token)) return;
+
+    if (uvResult.status === "fulfilled") renderUvIndex(uvResult.value);
+    else showUvMessage("Tidak tersedia");
+
+    if (pollenResult.status === "fulfilled") renderPollen(pollenResult.value);
+    else showPollenMessage("Tidak tersedia");
 };
 
 // ============================================================

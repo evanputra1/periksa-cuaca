@@ -56,12 +56,18 @@
             </div>
 
             <div class="cuaca-terakhir flex justify-between rounded-[5px] bg-brand p-[20px_70px_20px_20px] text-white max-[1400px]:p-5">
-                <div>
+                <div class="min-w-0">
                     <h2 class="text-[28px] font-bold max-[750px]:text-[1.35rem]">_______ ( ______ )</h2>
-                    <h6 class="mt-3 text-[16px] font-medium">Suhu: __&deg;C</h6>
-                    <h6 class="mt-3 text-[16px] font-medium">Angin: __ M/S</h6>
-                    <h6 class="mt-3 text-[16px] font-medium">Kelembapan: __%</h6>
-                    <h6 class="mt-3 text-[16px] font-medium">Kualitas Udara: <span class="nilai-udara font-semibold data-[tone=hijau]:text-aqi-hijau data-[tone=kuning]:text-aqi-kuning data-[tone=oranye]:text-aqi-oranye data-[tone=merah]:text-aqi-merah data-[tone=ungu]:text-aqi-ungu" id="nilai-udara">__</span></h6>
+                    <div class="mt-3 grid grid-cols-2 gap-x-8 gap-y-1.5 max-[600px]:grid-cols-1">
+                        <h6 class="text-[16px] font-medium max-[750px]:text-[15px]">Suhu: __&deg;C</h6>
+                        <h6 class="text-[16px] font-medium max-[750px]:text-[15px]">Terasa Seperti: __&deg;C</h6>
+                        <h6 class="text-[16px] font-medium max-[750px]:text-[15px]">Angin: __ M/S</h6>
+                        <h6 class="text-[16px] font-medium max-[750px]:text-[15px]">Kelembapan: __%</h6>
+                        <h6 class="text-[16px] font-medium max-[750px]:text-[15px]">Tekanan Udara: __ hPa</h6>
+                        <h6 class="text-[16px] font-medium max-[750px]:text-[15px]">Kualitas Udara: <span class="font-semibold data-[tone=hijau]:text-aqi-hijau data-[tone=kuning]:text-aqi-kuning data-[tone=oranye]:text-aqi-oranye data-[tone=merah]:text-aqi-merah data-[tone=ungu]:text-aqi-ungu" id="nilai-udara">__</span></h6>
+                        <h6 class="text-[16px] font-medium max-[750px]:text-[15px]">Indeks UV: <span class="font-semibold data-[tone=hijau]:text-aqi-hijau data-[tone=kuning]:text-aqi-kuning data-[tone=oranye]:text-aqi-oranye data-[tone=merah]:text-aqi-merah data-[tone=ungu]:text-aqi-ungu" id="nilai-uv">__</span></h6>
+                        <h6 class="text-[16px] font-medium max-[750px]:text-[15px]">Polen: <span class="font-semibold data-[tone=hijau]:text-aqi-hijau data-[tone=kuning]:text-aqi-kuning data-[tone=oranye]:text-aqi-oranye data-[tone=merah]:text-aqi-merah data-[tone=ungu]:text-aqi-ungu" id="nilai-polen">__</span></h6>
+                    </div>
                 </div>
                 <div class="icon text-center"></div>
             </div>
