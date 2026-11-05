@@ -18,6 +18,8 @@ const createToneState = () => ({ text: "__", tone: null, title: null });
 let airValueState = createToneState();
 let uvValueState = createToneState();
 let pollenValueState = createToneState();
+// Nilai mentah AQI/UV dipakai untuk ringkasan dan peringatan, bukan hanya teks.
+let environmentState = { aqi: null, uv: null };
 
 // Warna mengikuti atribut data-tone; tokennya ada di src/tailwind.css.
 const TONE_CLASSES = "font-semibold data-[tone=hijau]:text-aqi-hijau data-[tone=kuning]:text-aqi-kuning data-[tone=oranye]:text-aqi-oranye data-[tone=merah]:text-aqi-merah data-[tone=ungu]:text-aqi-ungu";
@@ -57,6 +59,24 @@ const detailPanel = document.querySelector("#rincian");
 const detailTitle = document.querySelector("#rincian-judul");
 const detailList = document.querySelector("#rincian-daftar");
 const detailClose = document.querySelector("#rincian-tutup");
+
+// Elemen baru: tema, ringkasan, peringatan, per jam, favorit, dan radar.
+const themeButton = document.querySelector("#tombol-tema");
+const themeIcon = document.querySelector("#ikon-tema");
+const insightText = document.querySelector("#insight");
+const insightList = document.querySelector("#ringkasan-daftar");
+const alertBox = document.querySelector("#peringatan");
+const alertTitle = document.querySelector("#peringatan-judul");
+const alertText = document.querySelector("#peringatan-teks");
+const hourlyList = document.querySelector("#daftar-jam");
+const favoritesList = document.querySelector("#daftar-favorit");
+const favoriteSave = document.querySelector("#simpan-favorit");
+const favoriteEmpty = document.querySelector("#favorit-kosong");
+const radarPanel = document.querySelector("#radar");
+const radarMap = document.querySelector("#radar-peta");
+const radarStatus = document.querySelector("#radar-status");
+const radarToggle = document.querySelector("#radar-main");
+const radarPlay = document.querySelector("#radar-putar");
 
 // API key OpenWeatherMap.
 // PERINGATAN: key di sisi klien selalu bisa dilihat pengunjung.
@@ -191,7 +211,12 @@ const readStorage = () => {
 
 const writeStorage = () => {
     try {
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ units, city: lastLocation }));
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
+            units,
+            city: lastLocation,
+            theme: themePreference,
+            favorites,
+        }));
     } catch {
         // Mode privat atau kuota penuh: aplikasi tetap jalan tanpa preferensi.
     }
@@ -242,6 +267,62 @@ const formatTime = (unixSeconds, offsetSeconds) => {
     const hours = String(hasOffset ? date.getUTCHours() : date.getHours()).padStart(2, "0");
     const minutes = String(hasOffset ? date.getUTCMinutes() : date.getMinutes()).padStart(2, "0");
     return `${hours}.${minutes}`;
+};
+
+// ============================================================
+// Tema terang/gelap & latar dinamis
+// ============================================================
+// themePreference: null = ikuti sistem, "light"/"dark" = pilihan manual.
+let themePreference = null;
+
+const systemThemeQuery = typeof window.matchMedia === "function"
+    ? window.matchMedia("(prefers-color-scheme: dark)")
+    : null;
+
+const prefersDarkTheme = () => Boolean(systemThemeQuery && systemThemeQuery.matches);
+const resolvedTheme = () => themePreference || (prefersDarkTheme() ? "dark" : "light");
+
+const applyTheme = () => {
+    const theme = resolvedTheme();
+    if (document.documentElement) document.documentElement.setAttribute("data-theme", theme);
+
+    if (themeButton) {
+        themeButton.setAttribute("aria-pressed", theme === "dark" ? "true" : "false");
+        themeButton.setAttribute("aria-label", theme === "dark" ? "Aktifkan tema terang" : "Aktifkan tema gelap");
+    }
+    if (themeIcon) themeIcon.textContent = theme === "dark" ? "☀️" : "🌙";
+};
+
+const toggleTheme = () => {
+    themePreference = resolvedTheme() === "dark" ? "light" : "dark";
+    applyTheme();
+    writeStorage();
+};
+
+// Kode kondisi OpenWeatherMap -> nama latar. Ikon berakhiran "n" berarti malam.
+const describeSky = (weatherItem) => {
+    const weather = (weatherItem && weatherItem.weather && weatherItem.weather[0]) || {};
+    const code = toNumber(weather.id);
+    const icon = typeof weather.icon === "string" ? weather.icon : "";
+    const isNight = icon.endsWith("n");
+
+    if (!Number.isFinite(code)) return { sky: null, isNight };
+    if (code >= 200 && code < 300) return { sky: "badai", isNight };
+    if (code >= 300 && code < 400) return { sky: "gerimis", isNight };
+    if (code >= 500 && code < 600) return { sky: "hujan", isNight };
+    if (code >= 600 && code < 700) return { sky: "salju", isNight };
+    if (code >= 700 && code < 800) return { sky: "berkabut", isNight };
+    if (code === 800) return { sky: isNight ? "malam" : "cerah", isNight };
+    if (code <= 802) return { sky: "berawan", isNight };
+    return { sky: "mendung", isNight };
+};
+
+// Warna latar halaman diatur CSS lewat atribut ini.
+const applySky = (view) => {
+    if (!document.documentElement) return;
+    const { sky } = describeSky(view && view.current);
+    if (sky) document.documentElement.setAttribute("data-langit", sky);
+    else document.documentElement.removeAttribute("data-langit");
 };
 
 // ============================================================
@@ -396,7 +477,9 @@ const buildIcon = (weatherItem, variant = "card") => {
     // Ukuran ikon berbeda antara kartu besar dan kartu harian.
     const imgClass = variant === "main"
         ? "-mt-[15px] max-w-[120px]"
-        : "-mb-[12px] mt-[5px] max-w-[80px] min-[1321px]:max-[1700px]:max-w-[72px]";
+        : variant === "hour"
+            ? "my-1 h-10 w-10 max-w-none"
+            : "-mb-[12px] mt-[5px] max-w-[80px] min-[1321px]:max-[1700px]:max-w-[72px]";
 
     // Tanpa ikon, jangan hasilkan <img src=""> (browser akan meminta ulang
     // halaman itu sendiri dan menampilkan gambar rusak).
@@ -416,6 +499,244 @@ const formatHumidity = (value) => {
 const formatPressure = (value) => {
     const pressure = toNumber(value);
     return Number.isFinite(pressure) && pressure > 0 ? `${Math.round(pressure)} hPa` : "-- hPa";
+};
+
+// ============================================================
+// Indeks kenyamanan, saran, dan peringatan dini
+// ============================================================
+const kelvinToCelsius = (value) => {
+    const kelvin = toNumber(value);
+    return Number.isFinite(kelvin) ? kelvin - 273.15 : NaN;
+};
+
+// Angka nyaman tidak cukup: kelembapan dan angin ikut menentukan.
+const comfortFrom = (feelsC, humidity, windMps) => {
+    const feels = toNumber(feelsC);
+    if (!Number.isFinite(feels)) return { label: "Tidak tersedia", tone: "netral" };
+
+    const humid = toNumber(humidity);
+    const wind = toNumber(windMps);
+    const windy = Number.isFinite(wind) && wind >= 8;
+
+    if (feels < 20 && windy) return { label: "Dingin Berangin", tone: "oranye" };
+    if (feels >= 35) return { label: "Panas Ekstrem", tone: "merah" };
+    if (feels >= 32 && humid >= 65) return { label: "Panas Lembab", tone: "merah" };
+    if (feels >= 32) return { label: "Panas", tone: "oranye" };
+    if (feels >= 28) return { label: "Hangat", tone: "kuning" };
+    if (feels >= 22) return { label: "Nyaman", tone: "hijau" };
+    if (feels >= 16) return { label: "Sejuk", tone: "hijau" };
+    return { label: "Dingin", tone: "kuning" };
+};
+
+const weatherCodeOf = (item) => {
+    const weather = item && Array.isArray(item.weather) ? item.weather[0] : null;
+    return toNumber(weather && weather.id);
+};
+
+const isRainCode = (item) => {
+    const code = weatherCodeOf(item);
+    return code >= 200 && code < 600;
+};
+
+const maxRainChance = (items) => (Array.isArray(items) ? items : [])
+    .reduce((max, item) => Math.max(max, toNumber(item && item.pop) || 0), 0);
+
+// Jam saja bisa menyesatkan: slot "24 jam ke depan" sering jatuh besok,
+// jadi sertakan tanggal bila harinya bukan hari ini.
+const describeSlotTime = (dt, timezone, todayLabel) => {
+    const time = formatTime(dt, timezone);
+    const dayLabel = formatDate(dt, timezone);
+    const isToday = !todayLabel || dayLabel === todayLabel;
+    return isToday || dayLabel === "--" ? `pukul ${time}` : `pukul ${time} (${dayLabel})`;
+};
+
+// Peringatan ekstrem diturunkan dari data ramalan yang sudah diambil,
+// jadi tidak butuh langganan One Call 3.0 (fitur alerts bawaan OWM).
+const computeAlerts = (view) => {
+    const alerts = [];
+    if (!view) return alerts;
+
+    const hourly = Array.isArray(view.hourly) ? view.hourly.slice(0, 8) : [];
+    const timezone = view.timezone;
+
+    const thunder = hourly.find((item) => {
+        const code = weatherCodeOf(item);
+        return code >= 200 && code < 300;
+    });
+    const heavyRain = hourly.find((item) => {
+        const code = weatherCodeOf(item);
+        const volume = toNumber(item && item.rain && item.rain["3h"]);
+        return [502, 503, 504, 522].includes(code) || (Number.isFinite(volume) && volume >= 10);
+    });
+    const strongWind = hourly.find((item) => toNumber(item && item.wind && item.wind.speed) >= 10);
+
+    if (thunder) {
+        alerts.push({
+            level: "tinggi",
+            title: "Potensi badai petir",
+            text: `Badai petir diperkirakan ${describeSlotTime(thunder.dt, timezone, view.todayLabel)}. Tunda aktivitas di area terbuka.`,
+        });
+    }
+    if (heavyRain) {
+        const volume = toNumber(heavyRain.rain && heavyRain.rain["3h"]);
+        const amount = Number.isFinite(volume) ? ` (${Math.round(volume)} mm)` : "";
+        alerts.push({
+            level: "tinggi",
+            title: "Hujan lebat",
+            text: `Hujan lebat diperkirakan ${describeSlotTime(heavyRain.dt, timezone, view.todayLabel)}${amount}. Waspadai genangan dan jalan licin.`,
+        });
+    }
+
+    const feelsValues = hourly
+        .map((item) => kelvinToCelsius(item && item.main && item.main.feels_like))
+        .filter((value) => Number.isFinite(value));
+    if (feelsValues.length > 0) {
+        const hottest = Math.max(...feelsValues);
+        const coldest = Math.min(...feelsValues);
+        if (hottest >= 35) {
+            alerts.push({
+                level: "sedang",
+                title: "Panas menyengat",
+                text: `Suhu terasa sampai ${formatTemperature(hottest + 273.15)} dalam 24 jam ke depan. Perbanyak minum dan hindari matahari siang.`,
+            });
+        }
+        if (coldest <= 5) {
+            alerts.push({
+                level: "sedang",
+                title: "Udara dingin",
+                text: `Suhu terasa turun sampai ${formatTemperature(coldest + 273.15)}. Kenakan pakaian berlapis.`,
+            });
+        }
+    }
+
+    if (strongWind) {
+        alerts.push({
+            level: "sedang",
+            title: "Angin kencang",
+            text: `Angin hingga ${formatWindSpeed(strongWind.wind.speed)} diperkirakan ${describeSlotTime(strongWind.dt, timezone, view.todayLabel)}. Amankan benda ringan di luar.`,
+        });
+    }
+
+    const uv = environmentState.uv;
+    if (Number.isFinite(uv) && uv >= 11) {
+        alerts.push({
+            level: "sedang",
+            title: "UV ekstrem",
+            text: `Indeks UV ${Math.round(uv * 10) / 10}. Hindari paparan matahari langsung pada siang hari.`,
+        });
+    }
+
+    const aqi = environmentState.aqi;
+    const airLevel = Number.isFinite(aqi) ? AIR_QUALITY_LEVELS[aqi] : null;
+    if (airLevel && aqi >= 4) {
+        alerts.push({ level: "sedang", title: "Kualitas udara buruk", text: airLevel.verdict });
+    }
+
+    return alerts;
+};
+
+const buildAdviceLines = (view) => {
+    const current = (view && view.current) || {};
+    const main = current.main || {};
+    const wind = current.wind || {};
+    const tempC = kelvinToCelsius(main.temp);
+    const feelsC = kelvinToCelsius(main.feels_like);
+    const comfort = comfortFrom(feelsC, main.humidity, wind.speed);
+    const hourly = Array.isArray(view && view.hourly) ? view.hourly.slice(0, 8) : [];
+    const rainChance = maxRainChance(hourly);
+    const uv = environmentState.uv;
+    const aqi = environmentState.aqi;
+    const lines = [];
+
+    computeAlerts(view).forEach((alert) => {
+        lines.push({
+            label: alert.title,
+            value: alert.text,
+            tone: alert.level === "tinggi" ? "merah" : "oranye",
+        });
+    });
+
+    lines.push({ label: "Kenyamanan", value: comfort.label, tone: comfort.tone });
+
+    let activity;
+    if (Number.isFinite(feelsC) && feelsC >= 35) activity = "Hindari aktivitas berat di luar ruangan pada siang hari.";
+    else if (Number.isFinite(uv) && uv >= 8) activity = "Batasi aktivitas luar pukul 10.00-16.00 karena UV sangat tinggi.";
+    else if (Number.isFinite(aqi) && aqi >= 4) activity = "Kurangi olahraga luar ruangan; kualitas udara buruk.";
+    else if (rainChance >= 0.7) activity = "Siapkan payung; peluang hujan tinggi dalam beberapa jam ke depan.";
+    else if (rainChance >= 0.4) activity = "Ada kemungkinan hujan; sebaiknya bawa payung.";
+    else if (Number.isFinite(feelsC) && feelsC >= 22 && feelsC <= 30) activity = "Cocok untuk lari pagi, bersepeda, atau jalan santai.";
+    else if (Number.isFinite(feelsC) && feelsC < 16) activity = "Dingin; lakukan pemanasan lebih lama sebelum berolahraga.";
+    else activity = "Waktu yang cukup baik untuk aktivitas ringan di luar ruangan.";
+    lines.push({ label: "Saran aktivitas", value: activity, tone: "netral" });
+
+    let clothing;
+    if (!Number.isFinite(tempC)) clothing = "Tidak tersedia.";
+    else if (tempC >= 30) clothing = "Pakaian tipis dan menyerap keringat; pakai topi bila lama di luar.";
+    else if (tempC >= 24) clothing = "Pakaian kasual berbahan ringan.";
+    else if (tempC >= 18) clothing = "Kemeja lengan panjang tipis atau jaket ringan.";
+    else if (tempC >= 10) clothing = "Jaket atau sweter, terutama pagi dan malam.";
+    else clothing = "Jaket tebal, sarung tangan, dan pakaian berlapis.";
+    if (rainChance >= 0.5) clothing += " Bawa jas hujan atau payung.";
+    lines.push({ label: "Saran pakaian", value: clothing, tone: "netral" });
+
+    const uvLevel = Number.isFinite(uv) ? levelFor(UV_LEVELS, uv) : null;
+    lines.push(uvLevel
+        ? {
+            label: "Indeks UV",
+            value: `${uvLevel.label} (${Math.round(uv * 10) / 10}) — ${uvLevel.verdict}`,
+            tone: uvLevel.tone,
+        }
+        : { label: "Indeks UV", value: "Sedang dimuat atau tidak tersedia.", tone: "netral" });
+
+    const airLevel = Number.isFinite(aqi) ? AIR_QUALITY_LEVELS[aqi] : null;
+    lines.push(airLevel
+        ? {
+            label: "Kualitas udara",
+            value: `${airLevel.label} (AQI ${aqi}/5) — ${airLevel.verdict}`,
+            tone: airLevel.tone,
+        }
+        : { label: "Kualitas udara", value: "Sedang dimuat atau tidak tersedia.", tone: "netral" });
+
+    return lines;
+};
+
+// Satu kalimat kesimpulan untuk bagian paling atas kartu hasil.
+const buildInsightSentence = (view) => {
+    if (!view) return "";
+    const current = view.current || {};
+    const main = current.main || {};
+    const weather = (current.weather && current.weather[0]) || {};
+    const tempC = kelvinToCelsius(main.temp);
+    const feelsC = kelvinToCelsius(main.feels_like);
+    const hourly = Array.isArray(view.hourly) ? view.hourly.slice(0, 8) : [];
+    const rainChance = maxRainChance(hourly);
+    const rainSlot = hourly.find((item) => isRainCode(item) && (toNumber(item.pop) || 0) >= 0.5);
+    const uv = environmentState.uv;
+    const sentences = [];
+
+    if (Number.isFinite(tempC)) {
+        const description = typeof weather.description === "string" && weather.description !== ""
+            ? `, ${weather.description}`
+            : "";
+        const difference = Number.isFinite(feelsC) ? feelsC - tempC : 0;
+        if (difference >= 3) {
+            sentences.push(`Suhu ${formatTemperature(main.temp)} terasa seperti ${formatTemperature(main.feels_like)} karena udara lembap.`);
+        } else {
+            sentences.push(`Suhu ${formatTemperature(main.temp)}${description}.`);
+        }
+    }
+
+    if (rainSlot) {
+        const chance = Math.round((toNumber(rainSlot.pop) || 0) * 100);
+        sentences.push(`Hujan diperkirakan ${describeSlotTime(rainSlot.dt, view.timezone, view.todayLabel)} (peluang ${chance}%).`);
+    } else if (rainChance >= 0.4) {
+        sentences.push(`Peluang hujan dalam 24 jam sekitar ${Math.round(rainChance * 100)}%.`);
+    }
+
+    if (Number.isFinite(uv) && uv >= 8) sentences.push("UV sangat tinggi, gunakan tabir surya.");
+    if (rainChance >= 0.5) sentences.push("Bawa payung.");
+
+    return sentences.join(" ");
 };
 
 // Kartu besar: kondisi cuaca SAAT INI (endpoint /weather).
@@ -535,6 +856,45 @@ const toggleDetails = (index) => {
 };
 
 // ============================================================
+// Perkiraan per jam (slot 3 jam dari endpoint forecast)
+// ============================================================
+const buildHourly = (list) => {
+    const nowSeconds = Date.now() / 1000;
+    return (Array.isArray(list) ? list : [])
+        .filter((item) => {
+            const dt = toNumber(item && item.dt);
+            return Number.isFinite(dt) && dt >= nowSeconds - 3 * 3600;
+        })
+        .slice(0, 8);
+};
+
+const renderHourly = (view) => {
+    if (!hourlyList) return;
+
+    const hourly = Array.isArray(view && view.hourly) ? view.hourly : [];
+    const timezone = view ? view.timezone : undefined;
+
+    if (hourly.length === 0) {
+        hourlyList.innerHTML = `<li class="text-[14px] text-slate-600 dark:text-slate-300">Data per jam belum tersedia.</li>`;
+        return;
+    }
+
+    hourlyList.innerHTML = hourly.map((item) => {
+        const { iconMarkup } = buildIcon(item, "hour");
+        const chance = toNumber(item.pop);
+        const pop = Number.isFinite(chance)
+            ? `<span class="mt-1 text-[12px] font-semibold ${chance >= 0.5 ? "text-sky-700 dark:text-sky-300" : "text-slate-600 dark:text-slate-300"}">${Math.round(chance * 100)}%</span>`
+            : "";
+        return `<li class="flex w-[96px] shrink-0 flex-col items-center rounded-lg bg-white px-2 py-3 text-center shadow-sm dark:bg-slate-800">
+                    <span class="text-[13px] font-semibold text-[#4a3f7a] dark:text-slate-300">${formatTime(item.dt, timezone)}</span>
+                    ${iconMarkup}
+                    <span class="text-[15px] font-semibold">${formatTemperature(item.main && item.main.temp)}</span>
+                    ${pop}
+                </li>`;
+    }).join("");
+};
+
+// ============================================================
 // Render & satuan
 // ============================================================
 const renderAll = (view, options = {}) => {
@@ -554,6 +914,13 @@ const renderAll = (view, options = {}) => {
     paintAirValue();
     paintUvValue();
     paintPollenValue();
+
+    applySky(view);
+    renderHourly(view);
+    renderInsight(view);
+    renderAlerts(view);
+    renderFavoriteControls();
+    syncRadarView(view);
 
     if (options.keepOpen && Number.isInteger(view.openDayIndex)) openDetails(view.openDayIndex);
     else closeDetails();
@@ -656,6 +1023,9 @@ const getWeatherDetails = async (cityName, latitude, longitude, token) => {
         : forecastTimezone;
     const todayLabel = formatDate(hasCurrent ? currentData.dt : fallbackItem.dt, timezone);
 
+    // Slot 24 jam pertama (8 x 3 jam) untuk daftar per jam.
+    const hourly = buildHourly(data.list);
+
     // Tanggal hari ini tidak diulang sebagai kartu (sudah ada di kartu besar).
     const view = {
         // Nama yang dipilih pengguna lebih dipercaya daripada `name` dari
@@ -665,6 +1035,7 @@ const getWeatherDetails = async (cityName, latitude, longitude, token) => {
             || (hasCurrent && currentData.name ? String(currentData.name) : DEFAULT_CITY_NAME),
         todayLabel,
         timezone,
+        hourly,
         latitude,
         longitude,
         at: Date.now(),
@@ -684,6 +1055,8 @@ const getWeatherDetails = async (cityName, latitude, longitude, token) => {
 
     // Baru sekarang kartu disentuh: bila salah satu pemeriksaan di atas
     // gagal, kartu lama tetap utuh dan tidak tertinggal di "Memuat…".
+    // Nilai lama tidak boleh dipakai ringkasan untuk kota baru.
+    environmentState = { aqi: null, uv: null };
     showAirQualityMessage("Memuat…");
     showUvMessage("Memuat…");
     showPollenMessage("Memuat…");
@@ -699,6 +1072,7 @@ const getWeatherDetails = async (cityName, latitude, longitude, token) => {
         at: view.at,
     };
     writeStorage();
+    renderFavoriteControls();
 
     // Tidak di-await: cuaca sudah tampil walau data tambahan masih dimuat.
     loadAirQuality(latitude, longitude, token);
@@ -742,9 +1116,14 @@ const renderAirQuality = (payload) => {
     const level = aqi === null ? null : AIR_QUALITY_LEVELS[aqi];
 
     if (!level) {
+        environmentState.aqi = null;
+        refreshSummary();
         showAirQualityMessage("Tidak tersedia");
         return;
     }
+
+    environmentState.aqi = aqi;
+    refreshSummary();
 
     // Angka AQI dan penjelasannya tetap terbaca lewat tooltip.
     airValueState = {
@@ -765,6 +1144,8 @@ const loadAirQuality = async (latitude, longitude, token) => {
         renderAirQuality(data);
     } catch (error) {
         if (isStale(token)) return;
+        environmentState.aqi = null;
+        refreshSummary();
         showAirQualityMessage("Tidak tersedia");
     }
 };
@@ -794,9 +1175,14 @@ const renderUvIndex = (payload) => {
     const value = toNumber(raw);
 
     if (!Number.isFinite(value) || value < 0) {
+        environmentState.uv = null;
+        refreshSummary();
         showUvMessage("Tidak tersedia");
         return;
     }
+
+    environmentState.uv = value;
+    refreshSummary();
 
     const level = levelFor(UV_LEVELS, value);
     const rounded = Math.round(value * 10) / 10;
@@ -852,10 +1238,339 @@ const loadEnvironment = async (latitude, longitude, token) => {
     if (isStale(token)) return;
 
     if (uvResult.status === "fulfilled") renderUvIndex(uvResult.value);
-    else showUvMessage("Tidak tersedia");
+    else {
+        environmentState.uv = null;
+        refreshSummary();
+        showUvMessage("Tidak tersedia");
+    }
 
     if (pollenResult.status === "fulfilled") renderPollen(pollenResult.value);
     else showPollenMessage("Tidak tersedia");
+};
+
+// ============================================================
+// Ringkasan & saran
+// ============================================================
+// Warna teks baris ringkasan; kelas Tailwind harus tertulis utuh.
+const INSIGHT_TONE_CLASSES = {
+    hijau: "text-emerald-700 dark:text-emerald-300",
+    kuning: "text-amber-700 dark:text-amber-300",
+    oranye: "text-orange-700 dark:text-orange-300",
+    merah: "text-red-700 dark:text-red-300",
+    ungu: "text-fuchsia-700 dark:text-fuchsia-300",
+    netral: "text-slate-900 dark:text-slate-100",
+};
+
+// Dipanggil lagi saat AQI/UV menyusul datang.
+const refreshSummary = () => {
+    if (!activeView) return;
+    renderInsight(activeView);
+    renderAlerts(activeView);
+};
+
+const renderInsight = (view) => {
+    const target = view || activeView;
+
+    if (insightText) {
+        insightText.textContent = buildInsightSentence(target) || "Ringkasan cuaca belum tersedia.";
+    }
+    if (!insightList) return;
+
+    insightList.innerHTML = buildAdviceLines(target).map((line) => `<li class="flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-md bg-[#f7f5ff] px-3 py-2 dark:bg-slate-700/40">
+                <span class="w-[132px] shrink-0 text-[13px] font-semibold uppercase tracking-wide text-[#4a3f7a] dark:text-slate-300">${escapeHtml(line.label)}</span>
+                <span class="flex-1 text-[14px] font-medium leading-snug ${INSIGHT_TONE_CLASSES[line.tone] || INSIGHT_TONE_CLASSES.netral}">${escapeHtml(line.value)}</span>
+            </li>`).join("");
+};
+
+const renderAlerts = (view) => {
+    if (!alertBox) return;
+
+    const alerts = computeAlerts(view || activeView);
+    if (alerts.length === 0) {
+        alertBox.hidden = true;
+        alertBox.removeAttribute("data-tingkat");
+        if (alertTitle) alertTitle.textContent = "";
+        if (alertText) alertText.textContent = "";
+        return;
+    }
+
+    const [first] = alerts;
+    alertBox.hidden = false;
+    alertBox.setAttribute("data-tingkat", first.level);
+    if (alertTitle) alertTitle.textContent = first.title;
+    if (alertText) {
+        alertText.textContent = alerts.length > 1
+            ? `${first.text} (+${alerts.length - 1} peringatan lain di Ringkasan & Saran.)`
+            : first.text;
+    }
+};
+
+// ============================================================
+// Kota favorit
+// ============================================================
+const FAVORITES_LIMIT = 8;
+let favorites = [];
+
+const sanitizeFavorite = (entry) => {
+    if (!entry || typeof entry !== "object") return null;
+    const lat = toNumber(entry.lat);
+    const lon = toNumber(entry.lon);
+    const name = typeof entry.name === "string" ? entry.name.trim() : "";
+    if (name === "" || !Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+    if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
+    return { name, lat, lon };
+};
+
+// Jarak 0,01 derajat (~1 km) dianggap kota yang sama.
+const isSamePlace = (a, b) => Boolean(a && b
+    && Math.abs(toNumber(a.lat) - toNumber(b.lat)) < 0.01
+    && Math.abs(toNumber(a.lon) - toNumber(b.lon)) < 0.01);
+
+const isFavorite = (place) => favorites.some((item) => isSamePlace(item, place));
+
+const addFavorite = (place) => {
+    const clean = sanitizeFavorite(place);
+    if (!clean) return;
+
+    if (isFavorite(clean)) {
+        showNotice(`${clean.name} sudah ada di daftar favorit.`, { kind: "info" });
+        return;
+    }
+    if (favorites.length >= FAVORITES_LIMIT) {
+        showNotice(`Daftar favorit penuh (maksimal ${FAVORITES_LIMIT} kota). Hapus salah satu dulu.`, { kind: "info" });
+        return;
+    }
+
+    favorites = favorites.concat(clean);
+    renderFavorites();
+    renderFavoriteControls();
+    writeStorage();
+};
+
+const removeFavorite = (index) => {
+    if (!Number.isInteger(index) || index < 0 || index >= favorites.length) return;
+    favorites = favorites.filter((_, position) => position !== index);
+    renderFavorites();
+    renderFavoriteControls();
+    writeStorage();
+};
+
+const renderFavoriteControls = () => {
+    if (!favoriteSave) return;
+    const already = lastLocation ? isFavorite(lastLocation) : false;
+    favoriteSave.disabled = !lastLocation || already;
+    favoriteSave.textContent = already ? "★ Tersimpan di favorit" : "☆ Simpan kota ini";
+};
+
+const renderFavorites = () => {
+    if (!favoritesList) return;
+
+    favoritesList.innerHTML = favorites.map((item, index) => `<li class="flex items-center gap-2 rounded-md border border-[#d6d0ea] bg-white px-2 py-1.5 dark:border-slate-600 dark:bg-slate-800">
+                <button type="button" class="min-w-0 flex-1 cursor-pointer truncate rounded bg-transparent px-1 py-1 text-left text-[14px] font-semibold text-[#4a3f7a] hover:text-brand focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[#212121] dark:text-slate-200" data-favorit="${index}">${escapeHtml(item.name)}</button>
+                <button type="button" class="cursor-pointer rounded px-1.5 py-0.5 text-[16px] leading-none text-[#7a2f00] hover:text-red-700 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[#212121] dark:text-amber-200" data-hapus="${index}" aria-label="Hapus ${escapeHtml(item.name)} dari favorit">&times;</button>
+            </li>`).join("");
+
+    if (favoriteEmpty) favoriteEmpty.hidden = favorites.length > 0;
+};
+
+// ============================================================
+// Peta radar hujan (RainViewer + Leaflet)
+// ============================================================
+const RADAR_API_URL = "https://api.rainviewer.com/public/weather-maps.json";
+const LEAFLET_CSS_URL = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+const LEAFLET_JS_URL = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+const OSM_TILE_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
+const OSM_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
+const RADAR_FRAME_COUNT = 6;
+
+let leafletPromise = null;
+const radarState = {
+    map: null,
+    layer: null,
+    frames: [],
+    index: 0,
+    timer: null,
+};
+
+const setRadarStatus = (message) => {
+    if (radarStatus) radarStatus.textContent = message;
+};
+
+// Leaflet baru diunduh saat pengguna benar-benar membuka peta.
+const loadLeaflet = () => {
+    if (leafletPromise) return leafletPromise;
+
+    leafletPromise = new Promise((resolve, reject) => {
+        if (window.L && typeof window.L.map === "function") {
+            resolve(window.L);
+            return;
+        }
+        if (typeof document === "undefined" || !document.head) {
+            reject(new Error("Peta tidak dapat dimuat di lingkungan ini."));
+            return;
+        }
+
+        const link = document.createElement("link");
+        link.rel = "stylesheet";
+        link.href = LEAFLET_CSS_URL;
+        document.head.appendChild(link);
+
+        const script = document.createElement("script");
+        script.src = LEAFLET_JS_URL;
+        script.async = true;
+        script.onload = () => {
+            if (window.L && typeof window.L.map === "function") resolve(window.L);
+            else reject(new Error("Pustaka peta gagal dimuat."));
+        };
+        script.onerror = () => reject(new Error("Pustaka peta gagal dimuat. Periksa koneksi internet."));
+        document.head.appendChild(script);
+    });
+
+    return leafletPromise;
+};
+
+const buildRadarTileUrl = (path) => `https://tilecache.rainviewer.com${path}/256/{z}/{x}/{y}/2/1_1.png`;
+
+const pickRadarFrames = (payload) => {
+    const frames = payload && payload.radar && Array.isArray(payload.radar.past) ? payload.radar.past : [];
+    return frames
+        .filter((frame) => frame && typeof frame.path === "string" && frame.path.startsWith("/"))
+        .slice(-RADAR_FRAME_COUNT);
+};
+
+const setRadarFrame = (index) => {
+    const L = window.L;
+    if (!radarState.map || !L || radarState.frames.length === 0) return;
+
+    const frame = radarState.frames[index];
+    if (!frame) return;
+    radarState.index = index;
+
+    if (radarState.layer && typeof radarState.map.removeLayer === "function") {
+        radarState.map.removeLayer(radarState.layer);
+    }
+    radarState.layer = L.tileLayer(buildRadarTileUrl(frame.path), {
+        opacity: 0.7,
+        attribution: 'Radar &copy; <a href="https://www.rainviewer.com/">RainViewer</a>',
+    }).addTo(radarState.map);
+
+    const stamp = toNumber(frame.time);
+    const label = Number.isFinite(stamp)
+        ? new Date(stamp * 1000).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })
+        : "";
+    setRadarStatus(label === ""
+        ? "Radar hujan terbaru."
+        : `Radar hujan pukul ${label} (waktu server RainViewer).`);
+};
+
+const stopRadarPlay = () => {
+    if (radarState.timer) {
+        window.clearInterval(radarState.timer);
+        radarState.timer = null;
+    }
+    if (radarPlay) {
+        radarPlay.setAttribute("aria-pressed", "false");
+        radarPlay.textContent = "Putar";
+    }
+};
+
+const stepRadar = () => {
+    if (radarState.frames.length === 0) return;
+    setRadarFrame((radarState.index + 1) % radarState.frames.length);
+};
+
+const toggleRadarPlay = () => {
+    if (radarState.timer) {
+        stopRadarPlay();
+        return;
+    }
+    if (radarState.frames.length < 2 || typeof window.setInterval !== "function") return;
+
+    radarState.timer = window.setInterval(stepRadar, 900);
+    if (radarPlay) {
+        radarPlay.setAttribute("aria-pressed", "true");
+        radarPlay.textContent = "Jeda";
+    }
+};
+
+const showRadar = async () => {
+    if (!radarMap) return;
+
+    if (radarToggle) radarToggle.disabled = true;
+    setRadarStatus("Memuat peta radar…");
+
+    try {
+        const L = await loadLeaflet();
+        const view = activeView;
+        const latitude = toNumber(view && view.latitude);
+        const longitude = toNumber(view && view.longitude);
+        const center = Number.isFinite(latitude) && Number.isFinite(longitude)
+            ? [latitude, longitude]
+            : [DEFAULT_CITY.lat, DEFAULT_CITY.lon];
+
+        radarMap.hidden = false;
+
+        if (!radarState.map) {
+            radarState.map = L.map(radarMap, { scrollWheelZoom: false }).setView(center, 8);
+            L.tileLayer(OSM_TILE_URL, { attribution: OSM_ATTRIBUTION, maxZoom: 18 }).addTo(radarState.map);
+        }
+
+        const payload = await requestJson(RADAR_API_URL, { timeoutMs: REQUEST_TIMEOUT_MS });
+        const frames = pickRadarFrames(payload);
+
+        if (frames.length === 0) {
+            setRadarStatus("Data radar hujan sedang tidak tersedia. Coba lagi beberapa saat lagi.");
+            return;
+        }
+
+        radarState.frames = frames;
+        setRadarFrame(frames.length - 1);
+        if (radarPlay) radarPlay.hidden = frames.length < 2;
+        syncRadarView(view);
+    } catch (error) {
+        console.error("Gagal memuat peta radar:", error);
+        setRadarStatus(error && error.message ? error.message : "Peta radar gagal dimuat.");
+        radarMap.hidden = true;
+    } finally {
+        if (radarToggle) radarToggle.disabled = false;
+    }
+};
+
+const toggleRadarPanel = () => {
+    if (!radarMap) return;
+
+    if (radarMap.hidden) showRadar();
+    else {
+        radarMap.hidden = true;
+        stopRadarPlay();
+        if (radarPlay) radarPlay.hidden = true;
+        setRadarStatus("Peta disembunyikan. Tekan “Tampilkan peta” untuk membuka lagi.");
+    }
+};
+
+const syncRadarView = (view) => {
+    if (!radarState.map || !view) return;
+    if (typeof radarState.map.setView !== "function") return;
+
+    const latitude = toNumber(view.latitude);
+    const longitude = toNumber(view.longitude);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
+
+    radarState.map.setView([latitude, longitude], radarState.map.getZoom() || 8);
+};
+
+// ============================================================
+// Lokasi otomatis saat halaman pertama dibuka
+// ============================================================
+const DEFAULT_CITY = { name: "Jakarta", lat: -6.2088, lon: 106.8456 };
+
+// Dipakai saat geolokasi otomatis ditolak atau tidak didukung.
+const loadDefaultCity = async (message) => {
+    // Banner info baru ditampilkan SETELAH cuaca berhasil dimuat, karena
+    // getWeatherDetails menghapus banner lama begitu render sukses.
+    const loaded = await loadWeather({ ...DEFAULT_CITY, at: Date.now() }).catch(() => false);
+    if (loaded && message) showNotice(message, { kind: "info" });
+    return loaded;
 };
 
 // ============================================================
@@ -1097,10 +1812,14 @@ const describeGeoError = (error) => {
 };
 
 // Mengambil koordinat perangkat lalu menampilkan cuacanya.
-const getUserCoordinates = async () => {
+const getUserCoordinates = async (options = {}) => {
     // Cek dukungan sebelum menaikkan token: kalau peramban tidak mendukung,
     // permintaan lain yang sedang berjalan tetap berhak mereset tombol.
     if (!navigator.geolocation) {
+        if (options.auto) {
+            loadDefaultCity(`Peramban ini tidak mendukung geolokasi. Menampilkan cuaca ${DEFAULT_CITY.name}.`);
+            return;
+        }
         showNotice("Peramban ini tidak mendukung geolokasi. Silakan cari nama kota secara manual.", {
             kind: "gagal",
         });
@@ -1143,6 +1862,12 @@ const getUserCoordinates = async () => {
     } catch (error) {
         if (isStale(token)) return;
         console.error("Kesalahan permintaan geolokasi:", error);
+        // Saat dibuka otomatis, jangan menyodorkan banner galat ke pengguna
+        // baru: tampilkan kota default saja.
+        if (options.auto) {
+            loadDefaultCity(`${describeGeoError(error)} Menampilkan cuaca ${DEFAULT_CITY.name}.`);
+            return;
+        }
         showNotice(describeGeoError(error), { kind: "gagal", retry: getUserCoordinates });
     } finally {
         if (!isStale(token)) setLoading(false);
@@ -1150,7 +1875,43 @@ const getUserCoordinates = async () => {
 };
 
 // Event listener tombol dan input.
-locationButton.addEventListener("click", getUserCoordinates);
+locationButton.addEventListener("click", () => getUserCoordinates());
+
+// Tema: tombol manual; selama belum ada pilihan manual, ikuti sistem.
+if (themeButton) themeButton.addEventListener("click", toggleTheme);
+if (systemThemeQuery && typeof systemThemeQuery.addEventListener === "function") {
+    systemThemeQuery.addEventListener("change", () => {
+        if (!themePreference) applyTheme();
+    });
+}
+
+// Favorit: simpan kota yang sedang tampil, buka atau hapus dari daftar.
+if (favoriteSave) favoriteSave.addEventListener("click", () => addFavorite(lastLocation));
+if (favoritesList) {
+    favoritesList.addEventListener("click", (event) => {
+        const target = event.target && typeof event.target.closest === "function" ? event.target : null;
+        if (!target) return;
+
+        const removeButton = target.closest("[data-hapus]");
+        if (removeButton) {
+            removeFavorite(toNumber(removeButton.dataset.hapus));
+            return;
+        }
+
+        const openButton = target.closest("[data-favorit]");
+        if (openButton) {
+            const favorite = favorites[toNumber(openButton.dataset.favorit)];
+            if (favorite) {
+                cityInput.value = "";
+                loadWeather(favorite);
+            }
+        }
+    });
+}
+
+// Peta radar: dimuat hanya saat tombol ditekan.
+if (radarToggle) radarToggle.addEventListener("click", toggleRadarPanel);
+if (radarPlay) radarPlay.addEventListener("click", toggleRadarPlay);
 
 searchButton.addEventListener("click", () => {
     // Kalau ada saran yang sedang disorot, tombol Search memilih saran itu
@@ -1319,10 +2080,16 @@ window.addEventListener("offline", () => {
     });
 });
 
-// Pulihkan satuan dan kota terakhir dari localStorage.
+// Pulihkan tema, satuan, kota terakhir, dan favorit dari localStorage.
 const restorePreferences = () => {
-    const saved = readStorage();
-    if (!saved) return;
+    const saved = readStorage() || {};
+
+    themePreference = saved.theme === "dark" || saved.theme === "light" ? saved.theme : null;
+    applyTheme();
+
+    favorites = Array.isArray(saved.favorites)
+        ? saved.favorites.map(sanitizeFavorite).filter(Boolean).slice(0, FAVORITES_LIMIT)
+        : [];
 
     // Kota dipulihkan lebih dulu supaya setUnits() tidak menimpa simpanan
     // kota dengan null saat menulis ulang preferensi.
@@ -1343,7 +2110,19 @@ const restorePreferences = () => {
 
     if (saved.units === "imperial") setUnits("imperial", { rerender: false });
 
+    renderFavorites();
     if (hasCity) reloadLast();
 };
 
+// Kunjungan pertama tanpa kota tersimpan: coba deteksi lokasi otomatis sekali.
+// Kalau ditolak, halaman tidak dibiarkan kosong.
+const startWithLocation = () => {
+    if (typeof navigator !== "undefined" && navigator.geolocation) {
+        getUserCoordinates({ auto: true });
+        return;
+    }
+    loadDefaultCity(`Peramban ini tidak mendukung geolokasi. Menampilkan cuaca ${DEFAULT_CITY.name}.`);
+};
+
 restorePreferences();
+if (!lastLocation) startWithLocation();

@@ -1,8 +1,16 @@
+/* source(none) mematikan pemindaian otomatis seluruh folder proyek, jadi isi
+   style.css hanya ditentukan dua berkas di bawah — build selalu bisa diulang. */
 @import "tailwindcss" source(none);
 
 @source "../index.html";
 @source "../script.js";
 
+/* Mode gelap manual: <html data-theme="dark">. Tanpa atribut itu, dark:
+   mengikuti prefers-color-scheme seperti bawaan Tailwind. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* Token desain: nama warna/font di sini otomatis jadi utility
+   (bg-brand, text-tile, text-aqi-kuning, dan seterusnya). */
 @theme {
   --font-sans: "Poppins", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 
@@ -19,8 +27,48 @@
   --color-aqi-ungu: #f3a6ff;
 }
 
+/* Latar halaman mengikuti kondisi cuaca (atribut data-langit di <html>).
+   Hanya warna latar halaman yang berubah; kartu tetap memakai warnanya
+   sendiri supaya teks tetap terbaca di semua kondisi. */
 @layer base {
+  html[data-langit="cerah"] { --langit-dari: #bfe0ff; --langit-ke: #e8f4ff; }
+  html[data-langit="berawan"] { --langit-dari: #c9d6e6; --langit-ke: #eef2f8; }
+  html[data-langit="mendung"] { --langit-dari: #a9b6c8; --langit-ke: #dde3ec; }
+  html[data-langit="gerimis"] { --langit-dari: #a9bfd2; --langit-ke: #dce7f1; }
+  html[data-langit="hujan"] { --langit-dari: #8fa6bd; --langit-ke: #ccd9e6; }
+  html[data-langit="badai"] { --langit-dari: #7c8299; --langit-ke: #c2c6d6; }
+  html[data-langit="salju"] { --langit-dari: #d7e8f9; --langit-ke: #f4f9ff; }
+  html[data-langit="berkabut"] { --langit-dari: #c3c9cd; --langit-ke: #e6e9eb; }
+  html[data-langit="malam"] { --langit-dari: #b9c4de; --langit-ke: #dfe5f3; }
+
+  /* Tema gelap memakai gradasi redup yang senada, bukan latar terang. */
+  html[data-theme="dark"] { --langit-dari: #0f172a; --langit-ke: #111c2e; }
+  html[data-theme="dark"][data-langit="cerah"] { --langit-dari: #12304f; --langit-ke: #0b1220; }
+  html[data-theme="dark"][data-langit="gerimis"] { --langit-dari: #172a3a; --langit-ke: #0f172a; }
+  html[data-theme="dark"][data-langit="hujan"] { --langit-dari: #1b2b3a; --langit-ke: #0b1220; }
+  html[data-theme="dark"][data-langit="badai"] { --langit-dari: #2a2340; --langit-ke: #0b1220; }
+  html[data-theme="dark"][data-langit="salju"] { --langit-dari: #1e293b; --langit-ke: #0f172a; }
+  html[data-theme="dark"][data-langit="malam"] { --langit-dari: #0b1220; --langit-ke: #131f33; }
+
   body {
     font-family: var(--font-sans);
+    color: #212121;
+    background-color: var(--color-page);
+    background-image: linear-gradient(120deg, var(--langit-dari, #cfe6fb) 0%, var(--langit-ke, #e3f2fd) 100%);
+    background-size: 180% 180%;
+    animation: langit-geser 26s ease-in-out infinite;
+    transition: color 0.3s ease;
   }
+
+  html[data-theme="dark"] body { color: #e2e8f0; }
+}
+
+@keyframes langit-geser {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body { animation: none; }
 }
